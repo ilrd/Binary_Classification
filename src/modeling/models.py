@@ -24,7 +24,7 @@ y_train = train_df[label]
 
 def get_callbacks():
     log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    checkpoint_filepath = f'tmp/model_checkpoint.h5'
+    checkpoint_filepath = f'checkpoints/model_checkpoint.h5'
 
     fit_callbacks = [
         callbacks.ReduceLROnPlateau(
@@ -45,7 +45,13 @@ def get_callbacks():
             log_dir=log_dir,
             histogram_freq=1,
         ),
+
+        callbacks.EarlyStopping(
+            monitor='val_acc',
+            patience=30,
+        ),
     ]
+
     return fit_callbacks
 
 
@@ -85,7 +91,8 @@ X_test = X_test.values
 fit_callbacks = get_callbacks()
 
 # K-fold cross validation
-kf = KFold(n_splits=10)
+K_SPLITS = 10
+kf = KFold(K_SPLITS)
 
 ACCURACIES = []
 for train_indecies, val_indecies in kf.split(X_train, y_train):
@@ -102,18 +109,20 @@ for train_indecies, val_indecies in kf.split(X_train, y_train):
 
     loss, acc = model.evaluate(X_fold_val, y_fold_val)
 
+    plt.figure()
+    plt.plot(history.history['loss'], label='loss')
+    plt.plot(history.history['val_loss'], label='val_loss')
+    plt.legend()
+    plt.show()
+
+    plt.figure()
+    plt.plot(history.history['acc'], label='acc')
+    plt.plot(history.history['val_acc'], label='val_acc')
+    plt.legend()
+    plt.show()
+
     ACCURACIES.append(acc)
 
-print(np.array(ACCURACIES).mean())  # Gives 0.792409485578537
+print(np.array(ACCURACIES).mean())  # Gives 0.7979775190353393
 
-plt.figure()
-plt.plot(history.history['loss'], label='loss')
-plt.plot(history.history['val_loss'], label='val_loss')
-plt.legend()
-plt.show()
 
-plt.figure()
-plt.plot(history.history['acc'], label='acc')
-plt.plot(history.history['val_acc'], label='val_acc')
-plt.legend()
-plt.show()
