@@ -125,4 +125,8 @@ for train_indecies, val_indecies in kf.split(X_train, y_train):
 
 print(np.array(ACCURACIES).mean())  # Gives 0.7979775190353393
 
+best_model = keras.models.load_model('checkpoints/model_checkpoint.h5')
+y_pred = np.round(best_model.predict(X_test).flatten()).astype(int)
 
+submission_df = pd.DataFrame(columns=['PassengerId', 'Survived'], data=zip(np.arange(892, 1310), y_pred))
+submission_df.to_csv('sumbission.csv', index=False)
