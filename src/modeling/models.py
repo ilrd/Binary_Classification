@@ -22,36 +22,61 @@ X_train = train_df.drop(columns=[label])
 y_train = train_df[label]
 
 
-def get_callbacks():
+def get_callbacks(val=True):
     log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    checkpoint_filepath = f'checkpoints/model_checkpoint.h5'
+    if val:
+        checkpoint_filepath = f'checkpoints/model_checkpoint.h5'
+        fit_callbacks = [
+            callbacks.ReduceLROnPlateau(
+                monitor='val_acc',
+                factor=0.1,
+                patience=15,
+                cooldown=10,
+                min_lr=1e-5,
+                verbose=1,
+            ),
+            callbacks.ModelCheckpoint(
+                filepath=checkpoint_filepath,
+                monitor='val_acc',
+                verbose=1,
+                save_best_only=True,
+            ),
+            callbacks.TensorBoard(
+                log_dir=log_dir,
+                histogram_freq=1,
+            ),
+            callbacks.EarlyStopping(
+                monitor='val_acc',
+                patience=50,
+            ),
+        ]
 
-    fit_callbacks = [
-        callbacks.ReduceLROnPlateau(
-            monitor='val_acc',
-            factor=0.1,
-            patience=15,
-            cooldown=10,
-            min_lr=1e-5,
-            verbose=1,
-        ),
-        callbacks.ModelCheckpoint(
-            filepath=checkpoint_filepath,
-            monitor='val_acc',
-            verbose=1,
-            save_best_only=True,
-        ),
-        callbacks.TensorBoard(
-            log_dir=log_dir,
-            histogram_freq=1,
-        ),
-
-        callbacks.EarlyStopping(
-            monitor='val_acc',
-            patience=30,
-        ),
-    ]
-
+    else:
+        checkpoint_filepath = f'checkpoints/best_model.h5'
+        fit_callbacks = [
+            callbacks.ReduceLROnPlateau(
+                monitor='acc',
+                factor=0.1,
+                patience=85,
+                cooldown=30,
+                min_lr=1e-5,
+                verbose=1,
+            ),
+            callbacks.ModelCheckpoint(
+                filepath=checkpoint_filepath,
+                monitor='acc',
+                verbose=1,
+                save_best_only=True,
+            ),
+            callbacks.TensorBoard(
+                log_dir=log_dir,
+                histogram_freq=1,
+            ),
+            callbacks.EarlyStopping(
+                monitor='acc',
+                patience=150,
+            ),
+        ]
     return fit_callbacks
 
 
@@ -69,7 +94,7 @@ def build_model():
 
     model = Model(inputs, outputs)
 
-    model.compile('adam', 'binary_crossentropy', metrics='acc')
+    model.compile('sgd', 'binary_crossentropy', metrics='acc')
 
     return model
 
@@ -87,46 +112,54 @@ X_test['Age'] = scaler.transform([X_test['Age']])[0]
 X_train = X_train.values
 X_test = X_test.values
 
-# Callbacks
-fit_callbacks = get_callbacks()
 
-# K-fold cross validation
-K_SPLITS = 10
-kf = KFold(K_SPLITS)
+def train_model():
+    # Callbacks
+    fit_callbacks = get_callbacks(val=True)
 
-ACCURACIES = []
-for train_indecies, val_indecies in kf.split(X_train, y_train):
-    X_fold_train = X_train[train_indecies]
-    X_fold_val = X_train[val_indecies]
+    # K-fold cross validation
+    K_SPLITS = 10
+    kf = KFold(K_SPLITS)
 
-    y_fold_train = y_train[train_indecies]
-    y_fold_val = y_train[val_indecies]
+    ACCURACIES = []
+    for train_indecies, val_indecies in kf.split(X_train, y_train):
+        X_fold_train = X_train[train_indecies]
+        X_fold_val = X_train[val_indecies]
 
-    model = build_model()
+        y_fold_train = y_train[train_indecies]
+        y_fold_val = y_train[val_indecies]
 
-    history = model.fit(X_fold_train, y_fold_train, epochs=200, validation_data=(X_fold_val, y_fold_val),
-                        callbacks=fit_callbacks)
+        model = build_model()
 
-    loss, acc = model.evaluate(X_fold_val, y_fold_val)
+        history = model.fit(X_fold_train, y_fold_train, epochs=200, validation_data=(X_fold_val, y_fold_val),
+                            callbacks=fit_callbacks)
 
-    plt.figure()
-    plt.plot(history.history['loss'], label='loss')
-    plt.plot(history.history['val_loss'], label='val_loss')
-    plt.legend()
-    plt.show()
+        loss, acc = model.evaluate(X_fold_val, y_fold_val)
 
-    plt.figure()
-    plt.plot(history.history['acc'], label='acc')
-    plt.plot(history.history['val_acc'], label='val_acc')
-    plt.legend()
-    plt.show()
+        plt.figure()
+        plt.plot(history.history['loss'], label='loss')
+        plt.plot(history.history['val_loss'], label='val_loss')
+        plt.legend()
+        plt.show()
 
-    ACCURACIES.append(acc)
+        plt.figure()
+        plt.plot(history.history['acc'], label='acc')
+        plt.plot(history.history['val_acc'], label='val_acc')
+        plt.legend()
+        plt.show()
 
-print(np.array(ACCURACIES).mean())  # Gives 0.7979775190353393
+        ACCURACIES.append(acc)
 
-best_model = keras.models.load_model('checkpoints/model_checkpoint.h5')
-y_pred = np.round(best_model.predict(X_test).flatten()).astype(int)
+    print(np.array(ACCURACIES).mean())  # Gives 0.7979775190353393
 
-submission_df = pd.DataFrame(columns=['PassengerId', 'Survived'], data=zip(np.arange(892, 1310), y_pred))
-submission_df.to_csv('sumbission.csv', index=False)
+
+fit_callbacks = get_callbacks(val=False)
+best_model = build_model()
+best_model.fit(X_train, y_train, 32, epochs=1500, callbacks=fit_callbacks)
+
+# To save the prediction on testing set
+# best_model = keras.models.load_model('checkpoints/best_model.h5')
+# y_pred = np.round(best_model.predict(X_test).flatten()).astype(int)
+#
+# submission_df = pd.DataFrame(columns=['PassengerId', 'Survived'], data=zip(np.arange(892, 1310), y_pred))
+# submission_df.to_csv('sumbission.csv', index=False)
