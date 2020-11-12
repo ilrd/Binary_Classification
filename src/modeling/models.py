@@ -119,12 +119,12 @@ def train_model():
     kf = KFold(K_SPLITS)
 
     ACCURACIES = []
-    for train_indecies, val_indecies in kf.split(X_train, y_train):
-        X_fold_train = X_train[train_indecies]
-        X_fold_val = X_train[val_indecies]
+    for train_indices, val_indices in kf.split(X_train, y_train):
+        X_fold_train = X_train[train_indices]
+        X_fold_val = X_train[val_indices]
 
-        y_fold_train = y_train[train_indecies]
-        y_fold_val = y_train[val_indecies]
+        y_fold_train = y_train[train_indices]
+        y_fold_val = y_train[val_indices]
 
         model = build_model()
 
@@ -159,4 +159,4 @@ best_model = keras.models.load_model('checkpoints/best_model.h5')
 y_pred = np.round(best_model.predict(X_test).flatten()).astype(int)
 
 submission_df = pd.DataFrame(columns=['PassengerId', 'Survived'], data=zip(np.arange(892, 1310), y_pred))
-submission_df.to_csv('sumbission.csv', index=False)
+submission_df.to_csv('submission.csv', index=False)
