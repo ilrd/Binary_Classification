@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from tensorflow.keras.layers import *
 from sklearn.model_selection import KFold
 from tensorflow.keras import Model
-from sklearn.preprocessing import Normalizer
+from sklearn.preprocessing import StandardScaler
 from tensorflow.keras import callbacks
 import datetime
 
@@ -57,8 +57,8 @@ def get_callbacks(val=True):
             callbacks.ReduceLROnPlateau(
                 monitor='acc',
                 factor=0.1,
-                patience=85,
-                cooldown=30,
+                patience=15,
+                cooldown=10,
                 min_lr=1e-5,
                 verbose=1,
             ),
@@ -74,7 +74,7 @@ def get_callbacks(val=True):
             ),
             callbacks.EarlyStopping(
                 monitor='acc',
-                patience=150,
+                patience=50,
             ),
         ]
     return fit_callbacks
@@ -94,19 +94,16 @@ def build_model():
 
     model = Model(inputs, outputs)
 
-    model.compile('sgd', 'binary_crossentropy', metrics='acc')
+    model.compile('adam', 'binary_crossentropy', metrics='acc')
 
     return model
 
 
-# Normalizing
-scaler = Normalizer()
+# Standardizing
+scaler = StandardScaler()
 
-X_train['Fare'] = scaler.fit_transform([X_train['Fare']])[0]
-X_train['Age'] = scaler.fit_transform([X_train['Age']])[0]
-
-X_test['Fare'] = scaler.transform([X_test['Fare']])[0]
-X_test['Age'] = scaler.transform([X_test['Age']])[0]
+X_train[['Fare', 'Age']] = scaler.fit_transform(X_train[['Fare', 'Age']])
+X_test[['Fare', 'Age']] = scaler.transform(X_test[['Fare', 'Age']])
 
 # Turning Dataframe to ndarray
 X_train = X_train.values
@@ -150,16 +147,16 @@ def train_model():
 
         ACCURACIES.append(acc)
 
-    print(np.array(ACCURACIES).mean())  # Gives 0.7979775190353393
+    print(np.array(ACCURACIES).mean())  # Gives ~0.83
 
 
 fit_callbacks = get_callbacks(val=False)
 best_model = build_model()
-best_model.fit(X_train, y_train, 32, epochs=1500, callbacks=fit_callbacks)
+best_history = best_model.fit(X_train, y_train, 32, epochs=70, callbacks=fit_callbacks)
 
 # To save the prediction on testing set
-# best_model = keras.models.load_model('checkpoints/best_model.h5')
-# y_pred = np.round(best_model.predict(X_test).flatten()).astype(int)
-#
-# submission_df = pd.DataFrame(columns=['PassengerId', 'Survived'], data=zip(np.arange(892, 1310), y_pred))
-# submission_df.to_csv('sumbission.csv', index=False)
+best_model = keras.models.load_model('checkpoints/best_model.h5')
+y_pred = np.round(best_model.predict(X_test).flatten()).astype(int)
+
+submission_df = pd.DataFrame(columns=['PassengerId', 'Survived'], data=zip(np.arange(892, 1310), y_pred))
+submission_df.to_csv('sumbission.csv', index=False)
