@@ -1,7 +1,11 @@
 # Binary Classification
 
+![alt text](imgs/Multiple.png)
+
 This project is based on Titanic dataset, and the task is to predict who survived and 
 who didn't given their sex, age, fare, etc.
+
+<img align="right" src="imgs/Pclass_displot.png">
 
 ## Methods and tools
 * Data Cleaning, Feature Engineering - Pandas
